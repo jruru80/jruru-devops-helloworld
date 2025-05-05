@@ -1,0 +1,42 @@
+pipeline {
+    agent any
+    
+    stages {
+        stage('Get Code'){
+            steps {
+                echo 'Trayendo codigo del repo'
+                git ('https://github.com/jruru80/jruru-devops-helloworld.git')
+                sh 'ls -la'
+                echo WORKSPACE 
+            }
+        }
+        stage('Rest'){
+            steps {
+                echo 'Trayendo la imagen de docker de wiremock oficial'
+                git ('https://github.com/jruru80/jruru-devops-helloworld.git')
+                echo 'Ejecutando wiremock con imagen docker usando nuestros test'
+                sh '''
+                export TEST_PATH=${WORKSPACE}/test/wiremock
+                docker run -d --rm \
+                    -e WIREMOCK_OPTIONS='--port 9090' \
+                    -p 9090:9090 \
+                    --name wiremock \
+                    -v ${TEST_PATH}:/home/wiremock \
+                    wiremock/wiremock:3.13.0
+                '''
+                sh '''
+                    export FLASK_APP=app/api.py
+                    export FLASK_ENV=development
+                    echo FLASK_APP
+                    nohup flask run &
+                    export PYTHONPATH=${WORKSPACE}
+                    nohup java -jar /Users/jesusrubia/devops-cloud/wiremock/wiremock-standalone-3.13.0.jar \
+                        --port 9090 --root-dir=${TEST_PATH} &
+                  pytest --junitxml=result-unit.xml test/rest
+                '''  
+                echo('paramos el contenedor wiremock')
+                sh 'docker stop wiremock'
+            }
+        }
+    }
+}
