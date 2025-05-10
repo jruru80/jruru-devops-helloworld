@@ -10,33 +10,62 @@ pipeline {
                 echo WORKSPACE 
             }
         }
-        stage('Rest'){
+        stage('Build'){
             steps {
-                echo 'Trayendo la imagen de docker de wiremock oficial'
-                git ('https://github.com/jruru80/jruru-devops-helloworld.git')
-                echo 'Ejecutando wiremock con imagen docker usando nuestros test'
-                sh '''
-                export TEST_PATH=${WORKSPACE}/test/wiremock
-                docker run -d --rm \
-                    -e WIREMOCK_OPTIONS='--port 9090' \
-                    -p 9090:9090 \
-                    --name wiremock \
-                    -v ${TEST_PATH}:/home/wiremock \
-                    wiremock/wiremock:3.13.0
-                '''
-                sh '''
-                    export FLASK_APP=app/api.py
-                    export FLASK_ENV=development
-                    echo FLASK_APP
-                    nohup flask run &
-                    export PYTHONPATH=${WORKSPACE}
-                    nohup java -jar /Users/jesusrubia/devops-cloud/wiremock/wiremock-standalone-3.13.0.jar \
-                        --port 9090 --root-dir=${TEST_PATH} &
-                  pytest --junitxml=result-unit.xml test/rest
-                '''  
-                echo('paramos el contenedor wiremock')
-                sh 'docker stop wiremock'
+                echo 'NO SE COMPILA NADA AL SER PYTHON'
+            }
+        }
+        stage('Tests'){
+            parallel {
+                stage('Unit'){
+                    steps {
+                        sh '''
+                            export PYTHONPATH=${WORKSPACE}
+                            pytest --junitxml=result-unit.xml test/unit
+                        '''
+                    }
+                }
+                stage('Rest'){
+                    steps {
+                        catchError(buildResult : 'UNSTABLE', stageResult: 'FAILURE'){
+                            echo 'Trayendo la imagen de docker de wiremock oficial'
+                            git ('https://github.com/wiremock/wiremock-docker.git')
+                            echo 'Ejecutando wiremock con imagen docker usando nuestros test'
+                            sh '''
+                            export TEST_PATH=${WORKSPACE}/test/wiremock
+                            docker run -d --rm \
+                                -e WIREMOCK_OPTIONS='--port 9090' \
+                                -p 9090:9090 \
+                                --name wiremock \
+                                -v ${TEST_PATH}:/home/wiremock \
+                                wiremock/wiremock:3.13.0
+                            '''
+                            sh '''
+                                export FLASK_APP=app/api.py
+                                export FLASK_ENV=development
+                                echo FLASK_APP
+                                flask run &
+                                export PYTHONPATH=${WORKSPACE}
+                              pytest --junitxml=result-rest.xml test/rest
+                            ''' 
+                        }
+                    }
+                }
+            }
+        }
+        stage('Results'){
+            steps {
+                junit 'result*.xml'
             }
         }
     }
+    post {
+        always {
+            // Limpiar el espacio de trabajo después de la compilación
+            cleanWs()
+            echo('paramos el contenedor wiremock')
+            sh 'docker stop wiremock'
+        }
+    }
+    
 }
