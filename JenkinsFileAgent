@@ -6,11 +6,8 @@ pipeline {
                 label 'linux'
             }
             steps {
-                echo 'Trayendo codigo del repo, rama develop'
-                script {
-                    git branch: 'develop',
-                    url: 'https://github.com/jruru80/jruru-devops-helloworld.git'
-                }
+                echo 'Trayendo codigo del repo'
+                git ('https://github.com/jruru80/jruru-devops-helloworld.git')
                 sh 'ls -la'
                 echo 'Workspace'
                 echo WORKSPACE 
