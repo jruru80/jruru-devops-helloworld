@@ -1,0 +1,118 @@
+pipeline {
+    agent none
+    stages {
+        stage('Get Code'){
+            agent {
+                label 'linux'
+            }
+            steps {
+                echo 'Trayendo codigo del repo'
+                git ('https://github.com/jruru80/jruru-devops-helloworld.git')
+                sh 'ls -la'
+                echo 'Workspace'
+                echo WORKSPACE 
+                sh 'whoami'
+                sh 'hostname'
+                stash includes: 'app/**/*', name:'app'
+                stash includes: 'test/**/*', name: 'test'
+            }
+        }
+        stage('Build'){
+            agent {
+                label 'linux'
+            }
+            steps {
+                echo 'NO SE COMPILA NADA AL SER PYTHON'
+                echo 'Workspace'
+                echo WORKSPACE 
+                sh 'whoami'
+                sh 'hostname'
+            }
+        }
+        stage('Tests'){
+            parallel {
+                stage('Unit'){
+                    agent {
+                        label 'linux && python && java'
+                    }
+                    steps {
+                        unstash 'app'
+                        unstash 'test'
+                        sh '''
+                            export PYTHONPATH=${WORKSPACE}
+                            pytest --junitxml=result-unit.xml test/unit
+                        '''
+                        stash includes:'result-unit.xml', name:'test-unit-result'
+                        echo 'Workspace'
+                        echo WORKSPACE 
+                        sh 'whoami'
+                        sh 'hostname'
+                    }
+                }
+                stage('Rest'){
+                    agent {
+                        label 'linux && python && java'
+                    }
+                    steps {
+                        catchError(buildResult : 'UNSTABLE', stageResult: 'FAILURE'){
+                            unstash 'app'
+                            unstash 'test'
+                            sh '''
+                                export PYTHONPATH=${WORKSPACE}
+                                export FLASK_APP=app/api.py
+                                export FLASK_ENV=development
+                                flask run > flask_started.txt &
+                                export TEST_PATH=${WORKSPACE}/test/wiremock
+                                java -jar /Users/jesusrubia/devops-cloud/wiremock/wiremock-standalone-3.13.0.jar \
+                                    --port 9090 --root-dir=${TEST_PATH} > wr_started.txt & 
+                            '''
+                            echo ('esperamos a que se hayan levantado los servidores para ejecutar los test rest')
+                            timeout(time: 30, unit: 'SECONDS'){
+                                waitUntil {
+                                    fileExists('flask_started.txt')
+                                    fileExists('wr_started.txt')
+                                }
+                            }
+                            echo ('servidores levantados, se ejecutan los test rest')
+                            sh 'export PYTHONPATH=${WORKSPACE}'
+                            sh 'pytest --junitxml=result-rest.xml test/rest'
+                            stash includes: 'result-rest.xml', name: 'test-rest-result'
+                            echo 'Workspace'
+                            echo WORKSPACE 
+                            sh 'whoami'
+                            sh 'hostname'
+                        }
+                    }
+                }
+            }
+        }
+        stage('Results'){
+            agent {
+                label 'linux && python'
+            }
+            steps {
+                unstash 'test-unit-result'
+                unstash 'test-rest-result'
+                junit 'result*.xml'
+                echo 'Workspace'
+                echo WORKSPACE 
+                sh 'whoami'
+                sh 'hostname'
+            }
+        }
+        stage("clean workspace") {
+            agent {
+                label 'linux'
+            }
+            steps {
+                script {
+                    echo ('borramos workspace, antes del borrado')
+                    sh "ls"
+                    cleanWs()
+                    echo ('despues del borrado workspace')
+                    sh "ls"
+                }
+            }
+         }   
+    }
+}
