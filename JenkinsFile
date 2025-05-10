@@ -23,28 +23,32 @@ pipeline {
                 '''
             }
         }
-        stage('Rest'){
-            steps {
-                catchError(buildResult : 'UNSTABLE', stageResult: 'FAILURE'){
-                    sh '''
-                        export PYTHONPATH=${WORKSPACE}
-                        export FLASK_APP=app/api.py
-                        export FLASK_ENV=development
-                        flask run > flask_started.txt &
-                        export TEST_PATH=${WORKSPACE}/test/wiremock
-                        java -jar /Users/jesusrubia/devops-cloud/wiremock/wiremock-standalone-3.13.0.jar \
-                            --port 9090 --root-dir=${TEST_PATH} > wr_started.txt & 
-                    '''
-                    echo ('esperamos a que se hayan levantado los servidores para ejecutar los test rest')
-                    timeout(time: 30, unit: 'SECONDS'){
-                        waitUntil {
-                            fileExists('flask_started.txt')
-                            fileExists('wr_started.txt')
+        stage('Tests'){
+            parallel {
+                stage('Rest'){
+                    steps {
+                        catchError(buildResult : 'UNSTABLE', stageResult: 'FAILURE'){
+                            sh '''
+                                export PYTHONPATH=${WORKSPACE}
+                                export FLASK_APP=app/api.py
+                                export FLASK_ENV=development
+                                flask run > flask_started.txt &
+                                export TEST_PATH=${WORKSPACE}/test/wiremock
+                                java -jar /Users/jesusrubia/devops-cloud/wiremock/wiremock-standalone-3.13.0.jar \
+                                    --port 9090 --root-dir=${TEST_PATH} > wr_started.txt & 
+                            '''
+                            echo ('esperamos a que se hayan levantado los servidores para ejecutar los test rest')
+                            timeout(time: 30, unit: 'SECONDS'){
+                                waitUntil {
+                                    fileExists('flask_started.txt')
+                                    fileExists('wr_started.txt')
+                                }
+                            }
+                            echo ('servidores levantados, se ejecutan los test rest')
+                            sh 'export PYTHONPATH=${WORKSPACE}'
+                            sh 'pytest --junitxml=result-rest.xml test/rest'
                         }
                     }
-                    echo ('servidores levantados, se ejecutan los test rest')
-                    sh 'export PYTHONPATH=${WORKSPACE}'
-                    sh 'pytest --junitxml=result-rest.xml test/rest'
                 }
             }
         }
