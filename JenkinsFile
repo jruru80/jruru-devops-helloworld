@@ -4,8 +4,7 @@ pipeline {
         stage('Get Code'){
             steps {
                 echo 'Trayendo codigo del repo'
-                git branch: 'master', \
-                url: 'https://github.com/jruru80/jruru-devops-helloworld.git'
+                git branch: 'master', url: 'https://github.com/jruru80/jruru-devops-helloworld.git'
                 sh 'ls -la'
                 echo 'Workspace'
                 echo WORKSPACE 
@@ -48,6 +47,18 @@ pipeline {
                 }
             }
         }
+        stage('Coverage'){
+            steps {
+                catchError(stageResult: 'UNSTABLE'){
+                        sh '''
+                            coverage run --source=app --omit=app/__init__.py,app/api.py -m pytest test/unit
+                            coverage xml
+                        '''
+                        cobertura coberturaReportFile : 'coverage.xml', onlyStable : false,\
+                        conditionalCoverageTargets : '90,80,90', lineCoverageTargets : '95,85,95'
+                }
+            }
+        }
         stage('Static'){
             steps {
                 catchError(stageResult: 'UNSTABLE'){
@@ -60,16 +71,17 @@ pipeline {
                 }
             }
         }
-        stage('Coverage'){
+        stage('Security'){
             steps {
                 catchError(stageResult: 'UNSTABLE'){
-                     sh '''
-                        coverage run --source=app --omit=app/__init__.py,app/api.py -m pytest test/unit
-                        coverage xml
+                    sh '''
+                        bandit --exit-zero -r . -f custom -o bandit.out \
+                        --msg-template "{relpath}:{line}: [{test_id}] {msg}"
                     '''
-                    cobertura coberturaReportFile : 'coverage.xml', onlyStable : false,\
-                    conditionalCoverageTargets : '90,80,90', lineCoverageTargets : '95,85,95'
-                } 
+                    recordIssues tools: [pyLint(name: 'Bandit', pattern: 'bandit.out')], \
+                    qualityGates : [[threshold:1, type: 'TOTAL', unstable: true], \
+                    [threshold: 3, type: 'TOTAL', unstable: false]]
+                }
             }
         }
  
