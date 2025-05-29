@@ -1,62 +1,28 @@
 pipeline {
-    agent none
+    agent any
     stages {
         stage('Get Code'){
-            agent {
-                label 'linux'
-            }
             steps {
                 echo 'Trayendo codigo del repo'
-                git ('https://github.com/jruru80/jruru-devops-helloworld.git')
+                git branch: 'master', url: 'https://github.com/jruru80/jruru-devops-helloworld.git'
                 sh 'ls -la'
                 echo 'Workspace'
                 echo WORKSPACE 
-                sh 'whoami'
-                sh 'hostname'
-                stash includes: 'app/**/*', name:'app'
-                stash includes: 'test/**/*', name: 'test'
-            }
-        }
-        stage('Build'){
-            agent {
-                label 'linux'
-            }
-            steps {
-                echo 'NO SE COMPILA NADA AL SER PYTHON'
-                echo 'Workspace'
-                echo WORKSPACE 
-                sh 'whoami'
-                sh 'hostname'
             }
         }
         stage('Tests'){
             parallel {
                 stage('Unit'){
-                    agent {
-                        label 'linux && python && java'
-                    }
                     steps {
-                        unstash 'app'
-                        unstash 'test'
                         sh '''
                             export PYTHONPATH=${WORKSPACE}
                             pytest --junitxml=result-unit.xml test/unit
                         '''
-                        stash includes:'result-unit.xml', name:'test-unit-result'
-                        echo 'Workspace'
-                        echo WORKSPACE 
-                        sh 'whoami'
-                        sh 'hostname'
                     }
                 }
                 stage('Rest'){
-                    agent {
-                        label 'linux && python && java'
-                    }
                     steps {
                         catchError(buildResult : 'UNSTABLE', stageResult: 'FAILURE'){
-                            unstash 'app'
-                            unstash 'test'
                             sh '''
                                 export PYTHONPATH=${WORKSPACE}
                                 export FLASK_APP=app/api.py
@@ -76,42 +42,73 @@ pipeline {
                             echo ('servidores levantados, se ejecutan los test rest')
                             sh 'export PYTHONPATH=${WORKSPACE}'
                             sh 'pytest --junitxml=result-rest.xml test/rest'
-                            stash includes: 'result-rest.xml', name: 'test-rest-result'
-                            echo 'Workspace'
-                            echo WORKSPACE 
-                            sh 'whoami'
-                            sh 'hostname'
                         }
                     }
                 }
             }
         }
-        stage('Results'){
-            agent {
-                label 'linux && python'
-            }
+        stage('Coverage'){
             steps {
-                unstash 'test-unit-result'
-                unstash 'test-rest-result'
-                junit 'result*.xml'
-                echo 'Workspace'
-                echo WORKSPACE 
-                sh 'whoami'
-                sh 'hostname'
+                catchError(stageResult: 'UNSTABLE'){
+                        sh '''
+                            coverage run --source=app --omit=app/__init__.py,app/api.py -m pytest test/unit
+                            coverage xml
+                        '''
+                        cobertura coberturaReportFile : 'coverage.xml', onlyStable : false,\
+                        conditionalCoverageTargets : '90,80,90', lineCoverageTargets : '95,85,95'
+                }
+            }
+        }
+        stage('Static'){
+            steps {
+                catchError(stageResult: 'UNSTABLE'){
+                    sh '''
+                        python3 -m flake8 --format=pylint --exit-zero app > flake8.out
+                    '''
+                    recordIssues tools: [flake8(name: 'Flake8', pattern: 'flake8.out')], \
+                    qualityGates : [[threshold:8, type: 'TOTAL', unstable: true], \
+                    [threshold: 10, type: 'TOTAL', unstable: false]]
+                }
+            }
+        }
+        stage('Security'){
+            steps {
+                catchError(stageResult: 'UNSTABLE'){
+                    sh '''
+                        bandit --exit-zero -r . -f custom -o bandit.out \
+                        --msg-template "{relpath}:{line}: [{test_id}] {msg}"
+                    '''
+                    recordIssues tools: [pyLint(name: 'Bandit', pattern: 'bandit.out')], \
+                    qualityGates : [[threshold:2, type: 'TOTAL', unstable: true], \
+                    [threshold: 4, type: 'TOTAL', unstable: false]]
+                }
+            }
+        }
+        stage ('Performance'){
+            steps {
+                catchError(stageResult: 'UNSTABLE'){
+                    sh '''
+                        /Users/jesusrubia/devops-cloud/apache-jmeter-5.6.3/bin/jmeter.sh \
+                        -n -t test/jmeter/flask.jmx -f -l flask.jtl
+                    '''
+                    echo ('esperamos a que se hayan levantado flask (etapa Rest) para ejecutar los test de rendimiento')
+                    timeout(time: 30, unit: 'SECONDS'){
+                        waitUntil {
+                            fileExists('flask_started.txt')
+                        }
+                    }
+                }
+                echo ('todo listo se ejecuta el report de los test de rendimiento')
+                perfReport sourceDataFiles : 'flask.jtl'
             }
         }
         stage("clean workspace") {
-            agent {
-                label 'linux'
-            }
             steps {
-                script {
-                    echo ('borramos workspace, antes del borrado')
-                    sh "ls"
-                    cleanWs()
-                    echo ('despues del borrado workspace')
-                    sh "ls"
-                }
+                echo ('borramos workspace, antes del borrado')
+                sh "ls"
+                cleanWs()
+                echo ('despues del borrado workspace')
+                sh "ls"
             }
          }   
     }
