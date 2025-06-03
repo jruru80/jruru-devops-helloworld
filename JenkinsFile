@@ -52,10 +52,11 @@ pipeline {
             steps {
                 catchError(stageResult: 'UNSTABLE'){
                         sh '''
-                            coverage run --source=app --omit=app/__init__.py,app/api.py -m pytest test/unit
+                            export PYTHONPATH=${WORKSPACE}
+                            coverage run --branch --source=app --omit=app/__init__.py,app/api.py -m pytest test/unit
                             coverage xml
                         '''
-                        cobertura coberturaReportFile : 'coverage.xml', onlyStable : false,\
+                        cobertura coberturaReportFile : 'coverage.xml', onlyStable : false, \
                         conditionalCoverageTargets : '90,80,90', lineCoverageTargets : '95,85,95'
                 }
             }
@@ -64,6 +65,7 @@ pipeline {
             steps {
                 catchError(stageResult: 'UNSTABLE'){
                     sh '''
+                        export PYTHONPATH=${WORKSPACE}
                         python3 -m flake8 --format=pylint --exit-zero app > flake8.out
                     '''
                     recordIssues tools: [flake8(name: 'Flake8', pattern: 'flake8.out')], \

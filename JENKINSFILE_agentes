@@ -81,7 +81,8 @@ pipeline {
                                 unstash 'app'
                                 unstash 'test'
                                 sh '''
-                                    coverage run --source=app --omit=app/__init__.py,app/api.py -m pytest test/unit
+                                    export PYTHONPATH=${WORKSPACE}
+                                    coverage run --branch --source=app --omit=app/__init__.py,app/api.py -m pytest test/unit
                                     coverage xml
                                 '''
                                 cobertura coberturaReportFile : 'coverage.xml', onlyStable : false,\
@@ -102,6 +103,7 @@ pipeline {
                             unstash 'app'
                             unstash 'test'
                             sh '''
+                                export PYTHONPATH=${WORKSPACE}
                                 python3 -m flake8 --format=pylint --exit-zero app > flake8.out
                             '''
                             recordIssues tools: [flake8(name: 'Flake8', pattern: 'flake8.out')], \
