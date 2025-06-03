@@ -77,7 +77,7 @@ pipeline {
                         label 'linux && python'
                     }
                     steps {
-                        catchError(stageResult: 'UNSTABLE'){
+                        catchError(buildResult : 'UNSTABLE', stageResult: 'UNSTABLE'){
                                 unstash 'app'
                                 unstash 'test'
                                 sh '''
@@ -99,7 +99,7 @@ pipeline {
                         label 'linux && python'
                     }
                     steps {
-                        catchError(stageResult: 'UNSTABLE'){
+                        catchError(buildResult : 'UNSTABLE', stageResult: 'UNSTABLE'){
                             unstash 'app'
                             unstash 'test'
                             sh '''
@@ -121,7 +121,7 @@ pipeline {
                         label 'linux && python'
                     }
                     steps {
-                        catchError(stageResult: 'UNSTABLE'){
+                        catchError(buildResult : 'UNSTABLE', stageResult: 'UNSTABLE'){
                             unstash 'app'
                             unstash 'test'
                             sh '''
@@ -146,7 +146,7 @@ pipeline {
                 label 'linux && python'
             }
             steps {
-                catchError(stageResult: 'UNSTABLE'){
+                catchError(buildResult : 'UNSTABLE', stageResult: 'UNSTABLE'){
                     unstash 'app'
                     unstash 'test'
                     echo ('levantamos flask en esta etapa')

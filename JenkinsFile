@@ -50,7 +50,7 @@ pipeline {
         }
         stage('Coverage'){
             steps {
-                catchError(stageResult: 'UNSTABLE'){
+                catchError(buildResult : 'UNSTABLE', stageResult: 'UNSTABLE'){
                         sh '''
                             export PYTHONPATH=.
                             coverage run --branch --source=app --omit=app/__init__.py,app/api.py -m pytest test/unit
@@ -63,7 +63,7 @@ pipeline {
         }
         stage('Static'){
             steps {
-                catchError(stageResult: 'UNSTABLE'){
+                catchError(buildResult : 'UNSTABLE', stageResult: 'UNSTABLE'){
                     sh '''
                         export PYTHONPATH=.
                         python3 -m flake8 --format=pylint --exit-zero app > flake8.out
@@ -76,7 +76,7 @@ pipeline {
         }
         stage('Security'){
             steps {
-                catchError(stageResult: 'UNSTABLE'){
+                catchError(buildResult : 'UNSTABLE', stageResult: 'UNSTABLE'){
                     sh '''
                         bandit --exit-zero -r . -f custom -o bandit.out \
                         --msg-template "{relpath}:{line}: [{test_id}] {msg}"
@@ -89,7 +89,7 @@ pipeline {
         }
         stage ('Performance'){
             steps {
-                catchError(stageResult: 'UNSTABLE'){
+                catchError(buildResult : 'UNSTABLE', stageResult: 'UNSTABLE'){
                     echo ('levantamos flask en esta etapa')
                     sh '''
                     export PYTHONPATH=.
