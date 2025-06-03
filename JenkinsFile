@@ -15,7 +15,7 @@ pipeline {
                 stage('Unit'){
                     steps {
                         sh '''
-                            export PYTHONPATH=${WORKSPACE}
+                            export PYTHONPATH=.
                             pytest --junitxml=result-unit.xml test/unit
                         '''
                     }
@@ -24,7 +24,7 @@ pipeline {
                     steps {
                         catchError(buildResult : 'UNSTABLE', stageResult: 'FAILURE'){
                             sh '''
-                                export PYTHONPATH=${WORKSPACE}
+                                export PYTHONPATH=.
                                 export FLASK_APP=app/api.py
                                 export FLASK_ENV=development
                                 flask run > flask_started.txt &
@@ -40,7 +40,7 @@ pipeline {
                                 }
                             }
                             echo ('servidores levantados, se ejecutan los test rest')
-                            sh 'export PYTHONPATH=${WORKSPACE}'
+                            sh 'export PYTHONPATH=.'
                             sh 'pytest --junitxml=result-rest.xml test/rest'
                             junit 'result*.xml'
                         }
@@ -65,7 +65,7 @@ pipeline {
             steps {
                 catchError(stageResult: 'UNSTABLE'){
                     sh '''
-                        export PYTHONPATH=${WORKSPACE}
+                        export PYTHONPATH=.
                         python3 -m flake8 --format=pylint --exit-zero app > flake8.out
                     '''
                     recordIssues tools: [flake8(name: 'Flake8', pattern: 'flake8.out')], \
@@ -92,7 +92,7 @@ pipeline {
                 catchError(stageResult: 'UNSTABLE'){
                     echo ('levantamos flask en esta etapa')
                     sh '''
-                    export PYTHONPATH=${WORKSPACE}
+                    export PYTHONPATH=.
                     export FLASK_APP=app/api.py
                     export FLASK_ENV=development
                     flask run > flask_started_for_performance.txt &
