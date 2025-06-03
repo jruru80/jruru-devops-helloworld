@@ -15,7 +15,7 @@ pipeline {
                 stage('Unit'){
                     steps {
                         sh '''
-                            export PYTHONPATH=${WORKSPACE}
+                            export PYTHONPATH=.
                             pytest --junitxml=result-unit.xml test/unit
                         '''
                     }
@@ -24,7 +24,7 @@ pipeline {
                     steps {
                         catchError(buildResult : 'UNSTABLE', stageResult: 'FAILURE'){
                             sh '''
-                                export PYTHONPATH=${WORKSPACE}
+                                export PYTHONPATH=.
                                 export FLASK_APP=app/api.py
                                 export FLASK_ENV=development
                                 flask run > flask_started.txt &
@@ -40,7 +40,7 @@ pipeline {
                                 }
                             }
                             echo ('servidores levantados, se ejecutan los test rest')
-                            sh 'export PYTHONPATH=${WORKSPACE}'
+                            sh 'export PYTHONPATH=.'
                             sh 'pytest --junitxml=result-rest.xml test/rest'
                             junit 'result*.xml'
                         }
@@ -50,20 +50,22 @@ pipeline {
         }
         stage('Coverage'){
             steps {
-                catchError(stageResult: 'UNSTABLE'){
+                catchError(buildResult : 'UNSTABLE', stageResult: 'UNSTABLE'){
                         sh '''
-                            coverage run --source=app --omit=app/__init__.py,app/api.py -m pytest test/unit
+                            export PYTHONPATH=.
+                            coverage run --branch --source=app --omit=app/__init__.py,app/api.py -m pytest test/unit
                             coverage xml
                         '''
-                        cobertura coberturaReportFile : 'coverage.xml', onlyStable : false,\
+                        cobertura coberturaReportFile : 'coverage.xml', onlyStable : false, \
                         conditionalCoverageTargets : '90,80,90', lineCoverageTargets : '95,85,95'
                 }
             }
         }
         stage('Static'){
             steps {
-                catchError(stageResult: 'UNSTABLE'){
+                catchError(buildResult : 'UNSTABLE', stageResult: 'UNSTABLE'){
                     sh '''
+                        export PYTHONPATH=.
                         python3 -m flake8 --format=pylint --exit-zero app > flake8.out
                     '''
                     recordIssues tools: [flake8(name: 'Flake8', pattern: 'flake8.out')], \
@@ -74,7 +76,7 @@ pipeline {
         }
         stage('Security'){
             steps {
-                catchError(stageResult: 'UNSTABLE'){
+                catchError(buildResult : 'UNSTABLE', stageResult: 'UNSTABLE'){
                     sh '''
                         bandit --exit-zero -r . -f custom -o bandit.out \
                         --msg-template "{relpath}:{line}: [{test_id}] {msg}"
@@ -87,10 +89,10 @@ pipeline {
         }
         stage ('Performance'){
             steps {
-                catchError(stageResult: 'UNSTABLE'){
+                catchError(buildResult : 'UNSTABLE', stageResult: 'UNSTABLE'){
                     echo ('levantamos flask en esta etapa')
                     sh '''
-                    export PYTHONPATH=${WORKSPACE}
+                    export PYTHONPATH=.
                     export FLASK_APP=app/api.py
                     export FLASK_ENV=development
                     flask run > flask_started_for_performance.txt &
