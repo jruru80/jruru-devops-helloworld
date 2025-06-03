@@ -4,7 +4,7 @@ pipeline {
         stage('Get Code'){
             steps {
                 echo 'Trayendo codigo del repo'
-                git branch: 'master', url: 'https://github.com/jruru80/jruru-devops-helloworld.git'
+                git branch: 'feature_fix_coverage', url: 'https://github.com/jruru80/jruru-devops-helloworld.git'
                 sh 'ls -la'
                 echo 'Workspace'
                 echo WORKSPACE 
